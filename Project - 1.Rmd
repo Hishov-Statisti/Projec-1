@@ -1,0 +1,87 @@
+---
+title: "Project 1 - Alon Goodman & Ran Hassid"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Q1 - Snakes & Ladders #
+
+## The Board Game ##
+
+```{r}
+Start_of_Ladder <- c(2,7,8,15,21,28,36,51,71,78,87)
+End_of_Ladder <- c(38,14,31,26,42,84,44,66,91,98,94)
+Start_of_Snake <- c(16,46,49,62,64,74,89,92,99)
+End_of_Snake <- c(6,25,11,19,60,53,68,88,80)
+```
+
+
+
+## Auxiliary Function - Sum of Digit ##
+
+```{r}
+digitsum <- function(n) {
+  while(n>=10){
+  n <-n %% 10 + floor(n / 10)
+  }
+  return(n)
+  }
+```
+
+## One game Function ##
+
+1. Rolling the dice.
+2. Check if we crossed the 100 and go back.
+3. Check if the final sum of digits is equal to value of the dice.
+4. Handle the snakes and ladders.
+```{r}
+Sanke_and_Ladder <- function(Start_of_Ladder,End_of_Ladder,Start_of_Snake,End_of_Snake){
+  Snake <- data.frame(Start_of_Snake,End_of_Snake)
+  Ladder <- data.frame(Start_of_Ladder,End_of_Ladder)
+  number_of_rolls <- 0
+  counter <- 1
+  while(counter < 100){
+    dice_roll <- sample(1:6,1) 
+    number_of_rolls <-  number_of_rolls + 1
+    counter <- counter + dice_roll
+    if (counter > 100){
+      dif <- counter - 100
+      counter <- 100 - dif
+      }
+    if (digitsum(counter) == dice_roll){
+      counter <- floor(counter/2)
+      }
+    if  (any(counter==Snake$Start_of_Snake)==T){
+      counter <- Snake$End_of_Snake[Snake$Start_of_Snake == counter]}
+    if  (any(counter==Ladder$Start_of_Ladder)==T){
+      counter <- Ladder$End_of_Ladder[Ladder$Start_of_Ladder == counter]}
+    }
+  return (number_of_rolls)
+}
+```
+
+## The Simulation ##
+```{r}
+Sanke_and_Ladder_sim <- replicate(5000,Sanke_and_Ladder(Start_of_Ladder,End_of_Ladder,Start_of_Snake,End_of_Snake))
+```
+
+### The Expected value ###
+```{r}
+mu <- mean(Sanke_and_Ladder_sim)
+mu
+```
+
+### Confidance Interval of 95% - CLT ###
+```{r}
+sd <- sqrt(var(Sanke_and_Ladder_sim)/5000)
+up <- mu + qnorm(0.975)*sd
+low <- mu - qnorm(0.975)*sd
+CI <- c(low,up)
+CI
+```
+
+
+
+
+
