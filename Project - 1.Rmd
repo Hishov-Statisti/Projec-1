@@ -35,6 +35,7 @@ digitsum <- function(n) {
 2. Check if we crossed the 100 and go back.
 3. Check if the final sum of digits is equal to value of the dice.
 4. Handle the snakes and ladders.
+
 ```{r}
 Sanke_and_Ladder <- function(Start_of_Ladder,End_of_Ladder,Start_of_Snake,End_of_Snake){
   Snake <- data.frame(Start_of_Snake,End_of_Snake)
@@ -81,7 +82,89 @@ CI <- c(low,up)
 CI
 ```
 
+# Q2 - X & O #
 
+
+# Q3 - Dogcatia #
+
+1. r - counter for the turn - total
+2. r.d - counter for dogs in the turn
+3. r.c - counter for cats in the turn
+4. X - dogs come - Poisson(lambda=3)
+5. Y - cats come - Poisson(lambda=1.5) - a cat enter the turn if and only if r=0   
+6. X.1 - dogs service - exp(mu=3)
+7. Y.1 - cats service - exp(mu=5)
+8. Only one server - one animal is served at time
+9. p.d - profit from dog - 1, damage from dog - 0.1
+10. p.c - profit from cat - 3
+11. total time - 12 hours = 720 minutes. t - clock counter
+
+```{r}
+dogcatia <- function(){
+  t <- 0 # clock counter
+  r <- 0 # counter for the  total turn
+  r.d <- 0 # counter for dogs in the turn
+  r.c <- 0 # counter for cats in the turn
+  r.d.y <- 0 # counter for dogs that was served
+  r.d.n <- 0 # counter for dogs that was not served
+  r.c.y <- 0 # counter for cats that was served
+  r.c.n <- 0 # counter for cats that was not served
+  p.d <- 0 # profit from dog
+  p.c <- 0 # profit from cat
+  next_turn <-c(rep("0",10))
+  turn_df <- data.frame(next_turn)
+  while(t<720){
+    # an animal comes
+    x <- rpois(1,3)
+    y <- rpois(1,1.5)
+    if(x<y){
+      if(r<10){
+        r.d <- r.d + 1
+        turn_df[r+1,r+1] <- "dog"
+        t <- t + x
+      }else{
+        r.d.n <- r.d.n + 1
+        }
+    if(x>y){
+      if (r>0){
+        r.c.n <- r.c.n + 1
+      }else{
+        r.c <- r.c + 1
+        turn_df[r+1,r+1] <-  "cat"
+        t <- t + y
+        }
+      }
+    }
+    # server an animal
+    if(turn_df[1,1]=="dog"){
+      x.1 <- rexp(1,3)
+    }
+  }
+}
+```
+
+
+
+
+
+
+
+
+```{r}
+z <- c(rep(0,10))
+z.1 <- c(rep("0",10))
+g <- data.frame(z,z.1)
+g[1,1] <- 2
+g[1,2] <- "dog"
+g[2,1] <- 2
+g[2,2] <- "cat"
+g
+g <- g[-c(1),]
+g
+g[nrow(g)+1,] <- c(0,"0")
+g
+
+```
 
 
 
