@@ -101,72 +101,225 @@ CI
 
 ```{r}
 dogcatia <- function(){
-  t.counter <- 0 # clock counter
-  r <- 0 # counter for the  total turn
-  r.d <- 0 # counter for dogs in the turn
-  r.c <- 0 # counter for cats in the turn
-  r.d.y <- 0 # counter for dogs that was served
-  r.d.n <- 0 # counter for dogs that was not served
-  r.c.y <- 0 # counter for cats that was served
-  r.c.n <- 0 # counter for cats that was not served
-  p.d <- 0 # profit from dog
-  p.c <- 0 # profit from cat
-  next_turn <-c(rep("0",10))
-  turn_df <- data.frame(next_turn)
+  ## function does.... input... output..
+  
+  # initialization
+  work.clock <- 0 # clock counter
+  is.bunny.available <- TRUE
+  mat.queue <- matrix(data = NA,nrow = 0,ncol = 3)
+  
+  dog.served.counter <- 0 # counter for dogs that was served
+  dog.not.served.counter <- 0 # counter for dogs that was not served
+  cat.served.counter <- 0 # counter for cats that was served
+  cat.not.served.counter <- 0 # counter for cats that was not served
+  
+  serve_start_time <- 0
+  serve_end_time <- 0
+  
+  #r <- 0 # counter for the  total turn
+  #r.d <- 0 # counter for dogs in the turn
+  #r.c <- 0 # counter for cats in the turn
+  
+  #p.d <- 0 # profit from dog
+  #p.c <- 0 # profit from cat
   
   
-  X <- numeric(0)
-  while (sum(X)<720) {
-    X <- c(X,rexp(n = 1,rate = 3))
+  ## data
+  dogs.arrive.time <- numeric(0)
+  while (sum(dogs.arrive.time)<720) {
+    dogs.arrive.time <- c(dogs.arrive.time,rexp(n = 1,rate = 3))
   }
-  Y <- numeric(0)
-  while (sum(Y)<720) {
-    Y <- c(Y,rexp(n = 1,rate = 1.5))
+  dogs.arrive.time <- cumsum(x = dogs.arrive.time) # dogs arrive time 
+  dogs.serve.time <- rexp(n = dogs.arrive.time,rate = 3) # potential serve time for each dog.
+  
+  cats.arrive.time <- numeric(0)
+  while (sum(cats.arrive.time)<720) {
+    cats.arrive.time <- c(cats.arrive.time,rexp(n = 1,rate = 1.5))
   }
+  cats.arrive.time <- cumsum(x = cats.arrive.time) # cats arrive time
+  cats.serve.time <- rexp(n = cats.arrive.time,rate = 5) # potential serve time for each cat.
+  ## end
   
-  X <- cumsum(x = X) # dogs arrive time 
-  Y <- cumsum(x = Y) # cats arrive time
+
   
-  ##################################################################33
-  # an animal enter the turn
+  print(sum(dogs.arrive.time<7))
   
-  
-  for (i in 1:720) {
-    if(r<10){
-      for(j in range((sum(1==x)))){
-        turn_df[r+j,r+j] <- "dog"
-      }
-      turn_df <- turn_df[c(1:10),]
-      r.d <- r.d + sum(i==X)
-      r <- r + sum(i==X)
-      if (r>10) {
-        r.d <- r.d - (r-10)
-        r <- 10
-      }
-      t.counter <- t.counter + sum(i==X) ??????????????
-      }else{
-        r.d.n <- r.d.n + 1
-      }
-    if (r>0){
-        r.c.n <- r.c.n + 1
-      }else{
-        r.c <- r.c + sum(i==Y)
-        turn_df[r+1,r+1] <-  "cat"
-        t <- t + y
+  while(work.clock < 7) {
+  #print(serve_end_time)
+  #print(dogs.arrive.time[1])
+  #print(mat.queue)
+    
+    if (dogs.arrive.time[1] < cats.arrive.time[1]) {
+      next_to_queue <- c("dog",dogs.arrive.time[1],dogs.serve.time[1])
+      dogs.arrive.time <- dogs.arrive.time[-1]
+      dogs.serve.time <- dogs.serve.time[-1]
+    } else {
+      next_to_queue <- c("cat",cats.arrive.time[1],cats.serve.time[1])
+      cats.arrive.time <- cats.arrive.time[-1]
+      cats.serve.time <- cats.serve.time[-1]
+    }
+    
+    
+    while (ifelse(test = length(mat.queue) > 0, 
+                  yes = work.clock + as.numeric(mat.queue[1,2]) < next_to_queue[2],
+                  no = FALSE)){
+      if(next_to_queue[1] == "dog"){
+      serve_end_time <- work.clock + as.numeric(mat.queue[1,3])
+      dog.served.counter <- dog.served.counter + 1
+    } else {
+      serve_end_time <- work.clock + as.numeric(mat.queue[1,3])
+      cat.served.counter <- cat.served.counter + 1
+    }
+      mat.queue <- matrix(data = mat.queue[-1,],ncol = 3)
+    }
+    
+    
+    if(next_to_queue[1] == "dog"){
+      serve_end_time <- work.clock + as.numeric(next_to_queue[3])
+      dog.served.counter <- dog.served.counter + 1
+    } else {
+      serve_end_time <- work.clock + as.numeric(next_to_queue[3])
+      cat.served.counter <- cat.served.counter + 1
+    }
+    
+    
+    while (next_to_queue[2] < serve_end_time) {
+      if (next_to_queue[1] == "dog") {
+      if (length(mat.queue[,1]) >= 10) {
+        dog.not.served.counter <- dog.not.served.counter + 1
+      } else { mat.queue <- rbind(mat.queue,next_to_queue) }
+    }
+    if (next_to_queue[1] == "cat") {
+      if (length(mat.queue[,1]) > 0) {
+        cat.not.served.counter <- cat.not.served.counter + 1
+      } else { mat.queue <- rbind(mat.queue,next_to_queue) }
+    }
+     
+      if (dogs.arrive.time[1] < cats.arrive.time[1]) {
+      next_to_queue <- c("dog",dogs.arrive.time[1],dogs.serve.time[1])
+      dogs.arrive.time <- dogs.arrive.time[-1]
+      dogs.serve.time <- dogs.serve.time[-1]
+      } else {
+      next_to_queue <- c("cat",cats.arrive.time[1],cats.serve.time[1])
+      cats.arrive.time <- cats.arrive.time[-1]
+      cats.serve.time <- cats.serve.time[-1]
+    }
+    }
+    work.clock <- serve_end_time
+    
+  }
+  return(c(dog.served.counter,dog.not.served.counter))
+}
+    
+    dogcatia()
+    #################################
+    
+    if (next_to_queue[1] == "dog") {
+      if (is.bunny.available){
+        #is.bunny.available <- FALSE
+        serve_end_time <- serve_func(next_to_queue,work.clock)
         }
+      else {
+        queue_func(mat.queue,next_to_queue) # update queue
+      }
+      }
+    if (next_to_queue[1] == "cat") {
+      if (is.bunny.available){
+        #is.bunny.available <- FALSE
+        serve_end_time <- serve_func(next_to_queue,work.clock)
+        }
+      else {
+        queue_func(mat.queue,next_to_queue) # update queue
+      }
+    }
     
+    if (serve_end_time <= min(dogs.arrive.time[1],cats.arrive.time[1])) {
+      work.clock <- serve_end_time
+      next_to_queue <- next_to_queue_func(dogs.arrive.time,dogs.serve.time,cats.arrive.time,cats.serve.time)
+      queue_func(mat.queue,next_to_queue)
+      }
+    else {
+      next_to_queue <- next_to_queue_func(dogs.arrive.time,dogs.serve.time,cats.arrive.time,cats.serve.time)
+      while (serve_end_time > next_to_queue[2]) {
+        queue_func(mat.queue,next_to_queue)
+        next_to_queue <- next_to_queue_func(dogs.arrive.time,dogs.serve.time,cats.arrive.time,cats.serve.time)
+        }
+      work.clock <- serve_end_time
+    }
     
-    if () {
+  }
+  profit.from.dog <- 1*dog.served.counter - 0.1*dog.not.served.counter
+  profit.from.cat <- 3*cat.served.counter
+  
+  return(c(dog.served.counter, dog.not.served.counter, profit.from.dog, cat.served.counter,cat.not.served.counter,  
+           profit.from.cat))
+}
+
+
+dogcatia()
+
+
+
+
+
+
+
+# functions
+  next_to_queue_func <- function(dogs.arrive.time,dogs.serve.time,cats.arrive.time,cats.serve.time){
+    if (dogs.arrive.time[1] < cats.arrive.time[1]) {
+      next_to_queue <- c("dog",dogs.arrive.time[1],dogs.serve.time[1])
+      dogs.arrive.time <- dogs.arrive.time[-1]
+      dogs.serve.time <- dogs.serve.time[-1]
+    }
+    else {
+      next_to_queue <- c("cat",cats.arrive.time[1],cats.serve.time[1])
+      cats.arrive.time <- cats.arrive.time[-1]
+      cats.serve.time <- cats.serve.time[-1]
+    }
+    
+    return(next_to_queue)
+  }
+  
+  serve_func <- function(next_to_queue,serve_start_time){
+    if(next_to_queue[1] == "dog"){
+      serve_end_time <- serve_start_time + as.numeric(next_to_queue[3])
+      dog.served.counter <- dog.served.counter + 1
+      is.bunny.available <- TRUE
+    }
+    else {
+      serve_end_time <- serve_start_time + as.numeric(next_to_queue[3])
+      cat.served.counter <- cat.served.counter + 1
+      is.bunny.available <- TRUE
+    }
+    return(serve_end_time)
+  }
+  
+  queue_func <- function(mat.queue,next_to_queue){
+    if (next_to_queue[1] == "dog") {
+      if (length(mat.queue[,1]) == 10) {
+        dog.not.served.counter <- dog.not.served.counter + 1
+      }
+      else {
+        mat.queue <- rbind(mat.queue,next_to_queue)
+      }
       
     }
-    r.d <- r.d + sum(i==X)
-    r.c <- r.c + sum(i==Y)
-    
-    
-    
+    if (next_to_queue[1] == "cat") {
+      if (length(mat.queue[,1]) > 0) {
+        cat.not.served.counter <- cat.not.served.counter + 1
+      }
+      else {
+        mat.queue <- rbind(mat.queue,next_to_queue)
+      }
+    }
+    return(mat.queue)
   }
   
-}
+  
+  # queue initialization
+  next_to_queue <- next_to_queue_func(dogs.arrive.time,dogs.serve.time,cats.arrive.time,cats.serve.time)
+
+
 ```
 
 
