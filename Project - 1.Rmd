@@ -32,30 +32,33 @@ digitsum <- function(n) {
 ## One game Function ##
 
 1. Rolling the dice.
+
 2. Check if we crossed the 100 and go back.
+
 3. Check if the final sum of digits is equal to value of the dice.
+
 4. Handle the snakes and ladders.
 
 ```{r}
 Sanke_and_Ladder <- function(Start_of_Ladder,End_of_Ladder,Start_of_Snake,End_of_Snake){
-  Snake <- data.frame(Start_of_Snake,End_of_Snake)
-  Ladder <- data.frame(Start_of_Ladder,End_of_Ladder)
-  number_of_rolls <- 0
-  counter <- 1
+  Snake <- data.frame(Start_of_Snake,End_of_Snake) # A table of where the snake start $ end
+  Ladder <- data.frame(Start_of_Ladder,End_of_Ladder) # A table of where the ladder start $ end
+  number_of_rolls <- 0 
+  counter <- 1 # The location of the player
   while(counter < 100){
-    dice_roll <- sample(1:6,1) 
+    dice_roll <- sample(1:6,1) # Rolling the dice
     number_of_rolls <-  number_of_rolls + 1
     counter <- counter + dice_roll
-    if (counter > 100){
+    if (counter > 100){ # Check if we crossed the 100 and go back
       dif <- counter - 100
       counter <- 100 - dif
       }
-    if (digitsum(counter) == dice_roll){
+    if (digitsum(counter) == dice_roll){ # Check if the final sum of digits is equal to value of the dice.
       counter <- floor(counter/2)
       }
-    if  (any(counter==Snake$Start_of_Snake)==T){
+    if  (any(counter==Snake$Start_of_Snake)==T){ # Handle the snakes
       counter <- Snake$End_of_Snake[Snake$Start_of_Snake == counter]}
-    if  (any(counter==Ladder$Start_of_Ladder)==T){
+    if  (any(counter==Ladder$Start_of_Ladder)==T){ # Handle the ladders
       counter <- Ladder$End_of_Ladder[Ladder$Start_of_Ladder == counter]}
     }
   return (number_of_rolls)
@@ -84,334 +87,950 @@ CI
 
 # Q2 - X & O #
 
+```{r}
+#install.packages("matricks")
+#install.packages("lattice")
+library(matricks)
+library(tidyverse)
+```
+
+```{r}
+check_if_win <- function(board,turn){
+  # input: board size and turn. output: True if the player won in this turn, False if not.
+  row_size <- sqrt(length(board))
+  board_matrix <- matrix(data = board,nrow = row_size,ncol = row_size)
+  any(c(apply(X = board_matrix==turn,FUN = all,MARGIN = 1), apply(X = board_matrix==turn,FUN = all,MARGIN = 2), all(diag(board_matrix) == turn), all(antidiag(board_matrix) == turn)))
+}
+```
+
+```{r}
+game <- function(size) {
+  # input: board size, output: a X/O game (possible results: Player 1 win = 1,Player 2 win = 2, Tie =3)
+  game_board <- numeric(size*size)
+  turn <- 1
+  game_result <- 0
+  
+  
+  while (game_result==0) {
+    # continue untill there is a game result (1,2,3)
+    game_board[sample(x = which(game_board==0),size = 1)] <- turn # sample the next place on the board from the available places
+    if (check_if_win(game_board,turn)) {
+      game_result <- turn
+    } # if the player won - determine the game result
+    
+    turn <- ifelse(test = turn==1, yes = 2, no = 1) # change the turn for next loop
+    
+    if (sum(game_board==0)==1) {
+      game_board[which(game_board==0)] <- 1
+      game_result <- ifelse(test = check_if_win(game_board,turn), yes = 1, no = 3)
+    } # if its the last turn in the game, check if player 1 win (game result: 1) or its a tie (game result: 3)
+  }
+  game_result
+}
+```
+
+```{r}
+board_sizes <- c(3:15,25,50)
+final_results <- matrix(data = numeric(15*3),nrow = 15,ncol = 3,dimnames = list(board_sizes,c("1 win","2 win","tie")))
+
+# simulate games for n=5000, board sizes as required and caculte the probs for each option (winners and tie)
+for (i in 1:15) {
+  temp_result <- replicate(n = 5000,expr = game(board_sizes[i]))
+  final_results[i,1] <- mean(temp_result==1)
+  final_results[i,2] <- mean(temp_result==2)
+  final_results[i,3] <- mean(temp_result==3)
+  print(i)
+}
+```
+
+```{r}
+# prepare the data for heatmap
+X<-cbind(arrayInd(1:(nrow(final_results)*ncol(final_results)),.dim=dim(final_results)),c(as.matrix(final_results)))
+X<-setNames(as.data.frame(X),c("board_size","winner","probs"))
+X<-transform(X,fill=(probs))
+```
+
+```{r}
+# heatmap
+ggplot(X,aes(x=board_size,y=winner,show.legend = FALSE)) +
+  geom_tile(aes(fill=fill)) +
+  scale_fill_gradient(low = "deepskyblue", high = "red", limits = c(0, 1), breaks = seq(0,1,.1), guide = guide_legend("probs")) +
+  geom_text(aes(label=round(probs,1))) +
+  ggtitle("Probs of X/O winner as a function of board sizes simulation") +
+  scale_x_discrete(name ="Board Size", limits=as.character(board_sizes)) +
+  scale_y_discrete(name ="Winner", limits=c("Player 1","Player 2","Tie"))
+```
 
 # Q3 - Dogcatia #
 
-1. r - counter for the turn - total
-2. r.d - counter for dogs in the turn
-3. r.c - counter for cats in the turn
-4. X - dogs come - Poisson(lambda=3)
-5. Y - cats come - Poisson(lambda=1.5) - a cat enter the turn if and only if r=0   
-6. X.1 - dogs service - exp(mu=3)
-7. Y.1 - cats service - exp(mu=5)
-8. Only one server - one animal is served at time
-9. p.d - profit from dog - 1, damage from dog - 0.1
-10. p.c - profit from cat - 3
-11. total time - 12 hours = 720 minutes. t.counter - clock counter
+## 3.1 ##
+
+### a,b,c ###
 
 ```{r}
-dogcatia <- function(){
-  ## function does.... input... output..
+dogcatia_10<-function()
+{
+  # arrival times of dogs
+  dogs.arrive.time<-rexp(1,3)
+  
+  while(dogs.arrive.time[length(dogs.arrive.time)]<720)
+  {
+    dogs.arrive.time<-c(dogs.arrive.time,dogs.arrive.time[length(dogs.arrive.time)]+rexp(1,3))
+  }
+  
+  # arrival times of cats
+  cats.arrive.time<-rexp(1,1.5)
+  while(cats.arrive.time[length(cats.arrive.time)]<720)
+  {
+    cats.arrive.time<-c(cats.arrive.time,cats.arrive.time[length(cats.arrive.time)]+rexp(1,1.5))
+  }
+  
+  #service time's of dogs
+  dogs.serve.time<-rexp(length(dogs.arrive.time),3)
+  
+  #service time's of cats
+  cats.serve.time<-rexp(length(cats.arrive.time),5)
+  
   
   # initialization
-  work.clock <- 0 # clock counter
-  is.bunny.available <- TRUE
-  mat.queue <- matrix(data = NA,nrow = 0,ncol = 3)
-  
-  dog.served.counter <- 0 # counter for dogs that was served
-  dog.not.served.counter <- 0 # counter for dogs that was not served
-  cat.served.counter <- 0 # counter for cats that was served
-  cat.not.served.counter <- 0 # counter for cats that was not served
-  
-  serve_start_time <- 0
-  serve_end_time <- 0
-  
-  #r <- 0 # counter for the  total turn
-  #r.d <- 0 # counter for dogs in the turn
-  #r.c <- 0 # counter for cats in the turn
-  
-  #p.d <- 0 # profit from dog
-  #p.c <- 0 # profit from cat
-  
-  
-  ## data
-  dogs.arrive.time <- numeric(0)
-  while (sum(dogs.arrive.time)<720) {
-    dogs.arrive.time <- c(dogs.arrive.time,rexp(n = 1,rate = 3))
+  work.clock<-0   # marks the current time
+  serve_start_time<-0   # a time when the next animal serve will begin
+  profit<-0   # the company profit
+  waited<-c()   # a vector of the queuing aninals
+  dogs_out<-c()   # a vector for the served dogs
+  cats_out<-c()   # a vector for the served cats
+  dog.served.counter<-0   #number of dogs have served 
+  cat.served.counter<-0   #number of dogs have served
+  dog.not.served.counter<-0   # number of dogs have rejected
+  cat.not.served.counter<-0   # number of cats have rejected
+  dogs.times<-dogs.arrive.time  # arrival times vector of dogs
+  cats.times<-cats.arrive.time   # arrival times vector of cats
+  num_waited<-c(0)   # a vector of the number of queuing aninals at all time intervals
+  num_times<-c(0)   # a vector of the start time of the intervals 
+  # as long as 12 hours have not passed
+  while(work.clock<=720)   
+  {
+    #"x" is the next animal that arrived
+    x<-min(dogs.times[1],cats.times[1])
+    # check if "x" is a dog or a cat
+    if(x==dogs.times[1])
+    {
+      type_x<-"dog" 
+    }else
+    {
+      type_x<-"cat"
+    }
+    # if the shop is open
+    if(work.clock<x)
+    {
+      # if there is no animal that in the queue
+      if(length(waited)==0)
+      {
+        # so "x" can enter to the shop
+        serve_start_time<-x
+        # calculate the time that "x" will finish the service
+        if(type_x=="dog")
+        {
+          work.clock<-serve_start_time+dogs.serve.time[which(dogs.arrive.time==x)]
+        }
+        if(type_x=="cat")
+        {
+          work.clock<-serve_start_time+cats.serve.time[which(cats.arrive.time==x)]
+        }
+        # check if "x" will finish the srvice before the shop will close
+        if(work.clock<=720)
+        {
+          if(type_x=="dog")
+          {
+            dog.served.counter<-dog.served.counter+1
+            profit<-profit+1
+            dogs_out<-c(dogs_out,x)
+            dogs.times<-dogs.times[-1]
+          }
+          if(type_x=="cat")
+          {
+            cat.served.counter<-cat.served.counter+1
+            profit<-profit+3
+            cats_out<-c(cats_out,x)
+            cats.times<-cats.times[-1]
+          }
+        }
+      }
+      # if the shop is open now, but there are animals that waiting in the queue before "x"
+      if(length(waited)>0)
+      {
+        # the first animals in the queue will enter to get a service
+        serve_start_time<-work.clock
+        num_times<-c(num_times, serve_start_time)
+        # check if the first animal in the queue is a dog or a cat
+        if(any(dogs_out==waited[1]))
+        {
+          first_waited_type<-"dog"
+        }
+        if(any(cats_out==waited[1]))
+        {
+          first_waited_type<-"cat"
+        }
+        # calculate the time that the first animal in the queue will finish the service
+        if(first_waited_type=="dog")
+        {
+          work.clock<-serve_start_time+dogs.serve.time[which(dogs.arrive.time==waited[1])]
+        }
+        if(first_waited_type=="cat")
+        {
+          work.clock<-serve_start_time+cats.serve.time[which(cats.arrive.time==waited[1])]
+        }
+        # check if he will finish before the shop will close
+        if(work.clock<=720)
+        {
+          if(first_waited_type=="dog")
+          {
+            dog.served.counter<-dog.served.counter+1
+            profit<-profit+1
+          }
+          if(first_waited_type=="cat")
+          {
+            cat.served.counter<-cat.served.counter+1
+            profit<-profit+3
+          }
+          #remove the customer from the line
+          waited<-waited[-1]
+          num_waited<-c(num_waited, length(waited))
+        }
+      }
+      # if the shop is not open  
+    }else
+    {
+      #if "x" is a cat
+      if(type_x=="cat")
+      {
+        # and there is nobody that waiting in queue ,
+        #"x" will enter the queue
+        if(length(waited)==0)
+        {
+          waited<-c(waited,x)
+          num_waited<-c(num_waited, length(waited))
+          num_times<-c(num_times, waited[length(waited)])
+          #if there are customers that waiting in the queue,
+          #"x" will be rejected
+        }else
+        {
+          cat.not.served.counter<-cat.not.served.counter+1
+        }
+        cats_out<-c(cats_out,x)
+        cats.times<-cats.times[-1]
+      }
+      #if "x" is a dog
+      if(type_x=="dog")
+      {
+        #and there is a place for "x" in the queue, 
+        #"x" will enter the queue
+        if(length(waited)<10)
+        {
+          waited<-c(waited,x)
+          num_waited<-c(num_waited, length(waited))
+          num_times<-c(num_times, waited[length(waited)])
+          #if there is no place for "x" in the queue
+          #"x" will be rejected
+        }else
+        {
+          dog.not.served.counter<-dog.not.served.counter+1
+          profit<-profit-0.1
+        }
+        dogs_out<-c(dogs_out,x)
+        dogs.times<-dogs.times[-1]
+      }
+    }
   }
-  dogs.arrive.time <- cumsum(x = dogs.arrive.time) # dogs arrive time 
-  dogs.serve.time <- rexp(n = dogs.arrive.time,rate = 3) # potential serve time for each dog.
-  
-  cats.arrive.time <- numeric(0)
-  while (sum(cats.arrive.time)<720) {
-    cats.arrive.time <- c(cats.arrive.time,rexp(n = 1,rate = 1.5))
+  # calculate the average number of animals in the queue
+  num_times_help<-(num_times)-(c(0,num_times[-length(num_times)]))
+  final_num_times<-num_times_help[-1]
+  if(length(num_waited)>length(final_num_times))
+  {
+    if(num_waited[length(num_waited)]==0)
+    {
+      num_waited<-num_waited[-length(num_waited)]
+    }
   }
-  cats.arrive.time <- cumsum(x = cats.arrive.time) # cats arrive time
-  cats.serve.time <- rexp(n = cats.arrive.time,rate = 5) # potential serve time for each cat.
-  ## end
-  
-
-  
-  print(sum(dogs.arrive.time<7))
-  
-  while(work.clock < 7) {
-  #print(serve_end_time)
-  #print(dogs.arrive.time[1])
-  #print(mat.queue)
-    
-    if (dogs.arrive.time[1] < cats.arrive.time[1]) {
-      next_to_queue <- c("dog",dogs.arrive.time[1],dogs.serve.time[1])
-      dogs.arrive.time <- dogs.arrive.time[-1]
-      dogs.serve.time <- dogs.serve.time[-1]
-    } else {
-      next_to_queue <- c("cat",cats.arrive.time[1],cats.serve.time[1])
-      cats.arrive.time <- cats.arrive.time[-1]
-      cats.serve.time <- cats.serve.time[-1]
-    }
-    
-    
-    while (ifelse(test = length(mat.queue) > 0, 
-                  yes = work.clock + as.numeric(mat.queue[1,2]) < next_to_queue[2],
-                  no = FALSE)){
-      if(next_to_queue[1] == "dog"){
-      serve_end_time <- work.clock + as.numeric(mat.queue[1,3])
-      dog.served.counter <- dog.served.counter + 1
-    } else {
-      serve_end_time <- work.clock + as.numeric(mat.queue[1,3])
-      cat.served.counter <- cat.served.counter + 1
-    }
-      mat.queue <- matrix(data = mat.queue[-1,],ncol = 3)
-    }
-    
-    
-    if(next_to_queue[1] == "dog"){
-      serve_end_time <- work.clock + as.numeric(next_to_queue[3])
-      dog.served.counter <- dog.served.counter + 1
-    } else {
-      serve_end_time <- work.clock + as.numeric(next_to_queue[3])
-      cat.served.counter <- cat.served.counter + 1
-    }
-    
-    
-    while (next_to_queue[2] < serve_end_time) {
-      if (next_to_queue[1] == "dog") {
-      if (length(mat.queue[,1]) >= 10) {
-        dog.not.served.counter <- dog.not.served.counter + 1
-      } else { mat.queue <- rbind(mat.queue,next_to_queue) }
-    }
-    if (next_to_queue[1] == "cat") {
-      if (length(mat.queue[,1]) > 0) {
-        cat.not.served.counter <- cat.not.served.counter + 1
-      } else { mat.queue <- rbind(mat.queue,next_to_queue) }
-    }
-     
-      if (dogs.arrive.time[1] < cats.arrive.time[1]) {
-      next_to_queue <- c("dog",dogs.arrive.time[1],dogs.serve.time[1])
-      dogs.arrive.time <- dogs.arrive.time[-1]
-      dogs.serve.time <- dogs.serve.time[-1]
-      } else {
-      next_to_queue <- c("cat",cats.arrive.time[1],cats.serve.time[1])
-      cats.arrive.time <- cats.arrive.time[-1]
-      cats.serve.time <- cats.serve.time[-1]
-    }
-    }
-    work.clock <- serve_end_time
-    
-  }
-  return(c(dog.served.counter,dog.not.served.counter))
+  mean_queue<-(sum(num_waited * final_num_times))/720
+  return(list("dogs_served"=dog.served.counter, "dogs_reject"=dog.not.served.counter, "cats_served"=cat.served.counter, "cats_reject"=cat.not.served.counter, "profit"=profit, "mean_queue"=mean_queue))
 }
-    
-    dogcatia()
-    #################################
-    
-    if (next_to_queue[1] == "dog") {
-      if (is.bunny.available){
-        #is.bunny.available <- FALSE
-        serve_end_time <- serve_func(next_to_queue,work.clock)
-        }
-      else {
-        queue_func(mat.queue,next_to_queue) # update queue
-      }
-      }
-    if (next_to_queue[1] == "cat") {
-      if (is.bunny.available){
-        #is.bunny.available <- FALSE
-        serve_end_time <- serve_func(next_to_queue,work.clock)
-        }
-      else {
-        queue_func(mat.queue,next_to_queue) # update queue
-      }
-    }
-    
-    if (serve_end_time <= min(dogs.arrive.time[1],cats.arrive.time[1])) {
-      work.clock <- serve_end_time
-      next_to_queue <- next_to_queue_func(dogs.arrive.time,dogs.serve.time,cats.arrive.time,cats.serve.time)
-      queue_func(mat.queue,next_to_queue)
-      }
-    else {
-      next_to_queue <- next_to_queue_func(dogs.arrive.time,dogs.serve.time,cats.arrive.time,cats.serve.time)
-      while (serve_end_time > next_to_queue[2]) {
-        queue_func(mat.queue,next_to_queue)
-        next_to_queue <- next_to_queue_func(dogs.arrive.time,dogs.serve.time,cats.arrive.time,cats.serve.time)
-        }
-      work.clock <- serve_end_time
-    }
-    
-  }
-  profit.from.dog <- 1*dog.served.counter - 0.1*dog.not.served.counter
-  profit.from.cat <- 3*cat.served.counter
-  
-  return(c(dog.served.counter, dog.not.served.counter, profit.from.dog, cat.served.counter,cat.not.served.counter,  
-           profit.from.cat))
-}
-
-
-dogcatia()
-
-
-
-
-
-
-
-# functions
-  next_to_queue_func <- function(dogs.arrive.time,dogs.serve.time,cats.arrive.time,cats.serve.time){
-    if (dogs.arrive.time[1] < cats.arrive.time[1]) {
-      next_to_queue <- c("dog",dogs.arrive.time[1],dogs.serve.time[1])
-      dogs.arrive.time <- dogs.arrive.time[-1]
-      dogs.serve.time <- dogs.serve.time[-1]
-    }
-    else {
-      next_to_queue <- c("cat",cats.arrive.time[1],cats.serve.time[1])
-      cats.arrive.time <- cats.arrive.time[-1]
-      cats.serve.time <- cats.serve.time[-1]
-    }
-    
-    return(next_to_queue)
-  }
-  
-  serve_func <- function(next_to_queue,serve_start_time){
-    if(next_to_queue[1] == "dog"){
-      serve_end_time <- serve_start_time + as.numeric(next_to_queue[3])
-      dog.served.counter <- dog.served.counter + 1
-      is.bunny.available <- TRUE
-    }
-    else {
-      serve_end_time <- serve_start_time + as.numeric(next_to_queue[3])
-      cat.served.counter <- cat.served.counter + 1
-      is.bunny.available <- TRUE
-    }
-    return(serve_end_time)
-  }
-  
-  queue_func <- function(mat.queue,next_to_queue){
-    if (next_to_queue[1] == "dog") {
-      if (length(mat.queue[,1]) == 10) {
-        dog.not.served.counter <- dog.not.served.counter + 1
-      }
-      else {
-        mat.queue <- rbind(mat.queue,next_to_queue)
-      }
-      
-    }
-    if (next_to_queue[1] == "cat") {
-      if (length(mat.queue[,1]) > 0) {
-        cat.not.served.counter <- cat.not.served.counter + 1
-      }
-      else {
-        mat.queue <- rbind(mat.queue,next_to_queue)
-      }
-    }
-    return(mat.queue)
-  }
-  
-  
-  # queue initialization
-  next_to_queue <- next_to_queue_func(dogs.arrive.time,dogs.serve.time,cats.arrive.time,cats.serve.time)
-
-
 ```
 
+```{r}
+results_1<-replicate(100,dogcatia_10())
 
+dogs_served_estimator_10 <- mean(as.numeric(results_1[1,]))
+dogs_reject_estimator_10<-mean(as.numeric(results_1[2,]))
+cats_served_estimator_10<-mean(as.numeric(results_1[3,]))
+cats_reject_estimator_10<-mean(as.numeric(results_1[4,]))
+profit_estimator_10<-mean(as.numeric(results_1[5,]))
+mean_queue_estimator_10<-mean(as.numeric(results_1[6,])) 
+```
 
+```{r}
+cat(paste("The dogs served estimator is",dogs_served_estimator_10,
+        "The dogs reject estimator is",dogs_reject_estimator_10,
+        "The cats served estimator is",cats_served_estimator_10,
+        "The cats reject estimator is",cats_reject_estimator_10,
+        "The profit estimator is",profit_estimator_10,
+        "The mean queue estimator is",mean_queue_estimator_10,sep = "\n"))
+```
 
+## 3.2 ##
 
+### a ###
 
+```{r}
+dogcatia_20<-function()
+{
+  # arrival times of dogs
+  dogs.arrive.time<-rexp(1,3)
+  
+  while(dogs.arrive.time[length(dogs.arrive.time)]<720)
+  {
+    dogs.arrive.time<-c(dogs.arrive.time,dogs.arrive.time[length(dogs.arrive.time)]+rexp(1,3))
+  }
+  
+  # arrival times of cats
+  cats.arrive.time<-rexp(1,1.5)
+  while(cats.arrive.time[length(cats.arrive.time)]<720)
+  {
+    cats.arrive.time<-c(cats.arrive.time,cats.arrive.time[length(cats.arrive.time)]+rexp(1,1.5))
+  }
+  
+  #service time's of dogs
+  dogs.serve.time<-rexp(length(dogs.arrive.time),3)
+  
+  #service time's of cats
+  cats.serve.time<-rexp(length(cats.arrive.time),5)
+  
+  
+  # initialization
+  work.clock<-0   # marks the current time
+  serve_start_time<-0   # a time when the next animal serve will begin
+  profit<-0   # the company profit
+  waited<-c()   # a vector of the queuing aninals
+  dogs_out<-c()   # a vector for the served dogs
+  cats_out<-c()   # a vector for the served cats
+  dog.served.counter<-0   #number of dogs have served 
+  cat.served.counter<-0   #number of dogs have served
+  dog.not.served.counter<-0   # number of dogs have rejected
+  cat.not.served.counter<-0   # number of cats have rejected
+  dogs.times<-dogs.arrive.time  # arrival times vector of dogs
+  cats.times<-cats.arrive.time   # arrival times vector of cats
+  num_waited<-c(0)   # a vector of the number of queuing animals at all time intervals
+  num_times<-c(0)   # a vector of the start time of the intervals 
+  # as long as 12 hours have not passed
+  while(work.clock<=720)   
+  {
+    #"x" is the next animal that arrived
+    x<-min(dogs.times[1],cats.times[1])
+    # check if "x" is a dog or a cat
+    if(x==dogs.times[1])
+    {
+      type_x<-"dog" 
+    }else
+    {
+      type_x<-"cat"
+    }
+    # if the shop is open
+    if(work.clock<x)
+    {
+      # if there is no animal that in the queue
+      if(length(waited)==0)
+      {
+        # so "x" can enter to the shop
+        serve_start_time<-x
+        # calculate the time that "x" will finish the service
+        if(type_x=="dog")
+        {
+          work.clock<-serve_start_time+dogs.serve.time[which(dogs.arrive.time==x)]
+        }
+        if(type_x=="cat")
+        {
+          work.clock<-serve_start_time+cats.serve.time[which(cats.arrive.time==x)]
+        }
+        # check if "x" will finish the srvice before the shop will close
+        if(work.clock<=720)
+        {
+          if(type_x=="dog")
+          {
+            dog.served.counter<-dog.served.counter+1
+            profit<-profit+1
+            dogs_out<-c(dogs_out,x)
+            dogs.times<-dogs.times[-1]
+          }
+          if(type_x=="cat")
+          {
+            cat.served.counter<-cat.served.counter+1
+            profit<-profit+3
+            cats_out<-c(cats_out,x)
+            cats.times<-cats.times[-1]
+          }
+        }
+      }
+      # if the shop is open now, but there are animals that waiting in the queue before "x"
+      if(length(waited)>0)
+      {
+        # the first animals in the queue will enter to get a service
+        serve_start_time<-work.clock
+        num_times<-c(num_times, serve_start_time)
+        # check if the first animal in the queue is a dog or a cat
+        if(any(dogs_out==waited[1]))
+        {
+          first_waited_type<-"dog"
+        }
+        if(any(cats_out==waited[1]))
+        {
+          first_waited_type<-"cat"
+        }
+        # calculate the time that the first animal in the queue will finish the service
+        if(first_waited_type=="dog")
+        {
+          work.clock<-serve_start_time+dogs.serve.time[which(dogs.arrive.time==waited[1])]
+        }
+        if(first_waited_type=="cat")
+        {
+          work.clock<-serve_start_time+cats.serve.time[which(cats.arrive.time==waited[1])]
+        }
+        # check if he will finish before the shop will close
+        if(work.clock<=720)
+        {
+          if(first_waited_type=="dog")
+          {
+            dog.served.counter<-dog.served.counter+1
+            profit<-profit+1
+          }
+          if(first_waited_type=="cat")
+          {
+            cat.served.counter<-cat.served.counter+1
+            profit<-profit+3
+          }
+          #remove the customer from the queue
+          waited<-waited[-1]
+          num_waited<-c(num_waited, length(waited))
+        }
+      }
+      # if the shop is not open  
+    }else
+    {
+      #if "x" is a cat
+      if(type_x=="cat")
+      {
+        # and there is nobody that waiting in queue ,
+        #"x" will enter the queue
+        if(length(waited)==0)
+        {
+          waited<-c(waited,x)
+          num_waited<-c(num_waited, length(waited))
+          num_times<-c(num_times, waited[length(waited)])
+          #if there are customers that waiting in the queue,
+          #"x" will be rejected
+        }else
+        {
+          cat.not.served.counter<-cat.not.served.counter+1
+        }
+        cats_out<-c(cats_out,x)
+        cats.times<-cats.times[-1]
+      }
+      #if "x" is a dog
+      if(type_x=="dog")
+      {
+        #and there is a place for "x" in the queue, 
+        #"x" will enter the queue
+        if(length(waited)<20)
+        {
+          waited<-c(waited,x)
+          num_waited<-c(num_waited, length(waited))
+          num_times<-c(num_times, waited[length(waited)])
+          #if there is no place for "x" in the queue
+          #"x" will be rejected
+        }else
+        {
+          dog.not.served.counter<-dog.not.served.counter+1
+          profit<-profit-0.1
+        }
+        dogs_out<-c(dogs_out,x)
+        dogs.times<-dogs.times[-1]
+      }
+    }
+  }
+  # calculate the average number of animals in the queue
+  num_times_help<-(num_times)-(c(0,num_times[-length(num_times)]))
+  final_num_times<-num_times_help[-1]
+  if(length(num_waited)>length(final_num_times))
+  {
+    if(num_waited[length(num_waited)]==0)
+    {
+      num_waited<-num_waited[-length(num_waited)]
+    }
+  }
+  mean_queue<-(sum(num_waited * final_num_times))/720
+  return(list("dogs_served"=dog.served.counter, "dogs_reject"=dog.not.served.counter, "cats_served"=cat.served.counter, "cats_reject"=cat.not.served.counter, "profit"=profit, "mean_queue"=mean_queue))
+}
+```
+
+```{r}
+results_2_a<-replicate(100,dogcatia_20())
+
+dogs_served_estimator_20 <- mean(as.numeric(results_2_a[1,]))
+dogs_reject_estimator_20<-mean(as.numeric(results_2_a[2,]))
+cats_served_estimator_20<-mean(as.numeric(results_2_a[3,]))
+cats_reject_estimator_20<-mean(as.numeric(results_2_a[4,]))
+profit_estimator_20<-mean(as.numeric(results_2_a[5,]))
+mean_queue_estimator_20<-mean(as.numeric(results_2_a[6,])) 
+```
+
+```{r}
+cat(paste("The dogs served estimator is",dogs_served_estimator_20,
+        "The dogs reject estimator is",dogs_reject_estimator_20,
+        "The cats served estimator is",cats_served_estimator_20,
+        "The cats reject estimator is",cats_reject_estimator_20,
+        "The profit estimator is",profit_estimator_20,
+        "The mean queue estimator is",mean_queue_estimator_20,sep = "\n"))
+```
+
+Because the dogs arrive more often, they will "take over" the queue.
+They are the ones who will get the most service so the main downside is that the company’s profit will go down.
+The cats are the ones who will be harmed by this because the chance of the queue being empty is smaller in this situation.
+
+### b ###
 
 
 ```{r}
-z <- c(1:10)
-z.1 <- c(rep("0",5),rep("1",5))
-g <- data.frame(z,z.1)
-g[1,1] <- 2
-g[1,2] <- "dog"
-g[2,1] <- 2
-g[2,2] <- "cat"
-g
-g <- g[-c(1),]
-g
-g[nrow(g)+1,] <- c(0,"0")
-g <- g[c(1:10),]
-
+dogcatia_service_rate_increased_by_10_precent<-function()
+{
+  # arrival times of dogs
+  dogs.arrive.time<-rexp(1,3)
+  
+  while(dogs.arrive.time[length(dogs.arrive.time)]<720)
+  {
+    dogs.arrive.time<-c(dogs.arrive.time,dogs.arrive.time[length(dogs.arrive.time)]+rexp(1,3))
+  }
+  
+  # arrival times of cats
+  cats.arrive.time<-rexp(1,1.5)
+  while(cats.arrive.time[length(cats.arrive.time)]<720)
+  {
+    cats.arrive.time<-c(cats.arrive.time,cats.arrive.time[length(cats.arrive.time)]+rexp(1,1.5))
+  }
+  
+  #service time's of dogs
+  dogs.serve.time<-rexp(length(dogs.arrive.time),3.3)
+  
+  #service time's of cats
+  cats.serve.time<-rexp(length(cats.arrive.time),5.5)
+  
+  
+  # initialization
+  work.clock<-0   # marks the current time
+  serve_start_time<-0   # a time when the next animal serve will begin
+  profit<-0   # the company profit
+  waited<-c()   # a vector of the queuing aninals
+  dogs_out<-c()   # a vector for the served dogs
+  cats_out<-c()   # a vector for the served cats
+  dog.served.counter<-0   #number of dogs have served 
+  cat.served.counter<-0   #number of dogs have served
+  dog.not.served.counter<-0   # number of dogs have rejected
+  cat.not.served.counter<-0   # number of cats have rejected
+  dogs.times<-dogs.arrive.time  # arrival times vector of dogs
+  cats.times<-cats.arrive.time   # arrival times vector of cats
+  num_waited<-c(0)   # a vector of the number of queuing aninals at all time intervals
+  num_times<-c(0)   # a vector of the start time of the intervals 
+  # as long as 12 hours have not passed
+  while(work.clock<=720)   
+  {
+    #"x" is the next animal that arrived
+    x<-min(dogs.times[1],cats.times[1])
+    # check if "x" is a dog or a cat
+    if(x==dogs.times[1])
+    {
+      type_x<-"dog" 
+    }else
+    {
+      type_x<-"cat"
+    }
+    # if the shop is open
+    if(work.clock<x)
+    {
+      # if there is no animal that in the queue
+      if(length(waited)==0)
+      {
+        # so "x" can enter to the shop
+        serve_start_time<-x
+        # calculate the time that "x" will finish the service
+        if(type_x=="dog")
+        {
+          work.clock<-serve_start_time+dogs.serve.time[which(dogs.arrive.time==x)]
+        }
+        if(type_x=="cat")
+        {
+          work.clock<-serve_start_time+cats.serve.time[which(cats.arrive.time==x)]
+        }
+        # check if "x" will finish the srvice before the shop will close
+        if(work.clock<=720)
+        {
+          if(type_x=="dog")
+          {
+            dog.served.counter<-dog.served.counter+1
+            profit<-profit+1
+            dogs_out<-c(dogs_out,x)
+            dogs.times<-dogs.times[-1]
+          }
+          if(type_x=="cat")
+          {
+            cat.served.counter<-cat.served.counter+1
+            profit<-profit+3
+            cats_out<-c(cats_out,x)
+            cats.times<-cats.times[-1]
+          }
+        }
+      }
+      # if the shop is open now, but there are animals that waiting in the queue before "x"
+      if(length(waited)>0)
+      {
+        # the first animals in the queue will enter to get a service
+        serve_start_time<-work.clock
+        num_times<-c(num_times, serve_start_time)
+        # check if the first animal in the queue is a dog or a cat
+        if(any(dogs_out==waited[1]))
+        {
+          first_waited_type<-"dog"
+        }
+        if(any(cats_out==waited[1]))
+        {
+          first_waited_type<-"cat"
+        }
+        # calculate the time that the first animal in the queue will finish the service
+        if(first_waited_type=="dog")
+        {
+          work.clock<-serve_start_time+dogs.serve.time[which(dogs.arrive.time==waited[1])]
+        }
+        if(first_waited_type=="cat")
+        {
+          work.clock<-serve_start_time+cats.serve.time[which(cats.arrive.time==waited[1])]
+        }
+        # check if he will finish before the shop will close
+        if(work.clock<=720)
+        {
+          if(first_waited_type=="dog")
+          {
+            dog.served.counter<-dog.served.counter+1
+            profit<-profit+1
+          }
+          if(first_waited_type=="cat")
+          {
+            cat.served.counter<-cat.served.counter+1
+            profit<-profit+3
+          }
+          #remove the customer from the line
+          waited<-waited[-1]
+          num_waited<-c(num_waited, length(waited))
+        }
+      }
+      # if the shop is not open  
+    }else
+    {
+      #if "x" is a cat
+      if(type_x=="cat")
+      {
+        # and there is nobody that waiting in queue ,
+        #"x" will enter the queue
+        if(length(waited)==0)
+        {
+          waited<-c(waited,x)
+          num_waited<-c(num_waited, length(waited))
+          num_times<-c(num_times, waited[length(waited)])
+          #if there are customers that waiting in the queue,
+          #"x" will be rejected
+        }else
+        {
+          cat.not.served.counter<-cat.not.served.counter+1
+        }
+        cats_out<-c(cats_out,x)
+        cats.times<-cats.times[-1]
+      }
+      #if "x" is a dog
+      if(type_x=="dog")
+      {
+        #and there is a place for "x" in the queue, 
+        #"x" will enter the queue
+        if(length(waited)<10)
+        {
+          waited<-c(waited,x)
+          num_waited<-c(num_waited, length(waited))
+          num_times<-c(num_times, waited[length(waited)])
+          #if there is no place for "x" in the queue
+          #"x" will be rejected
+        }else
+        {
+          dog.not.served.counter<-dog.not.served.counter+1
+          profit<-profit-0.1
+        }
+        dogs_out<-c(dogs_out,x)
+        dogs.times<-dogs.times[-1]
+      }
+    }
+  }
+  # calculate the average number of animals in the queue
+  num_times_help<-(num_times)-(c(0,num_times[-length(num_times)]))
+  final_num_times<-num_times_help[-1]
+  if(length(num_waited)>length(final_num_times))
+  {
+    if(num_waited[length(num_waited)]==0)
+    {
+      num_waited<-num_waited[-length(num_waited)]
+    }
+  }
+  mean_queue<-(sum(num_waited * final_num_times))/720
+  return(list("dogs_served"=dog.served.counter, "dogs_reject"=dog.not.served.counter, "cats_served"=cat.served.counter, "cats_reject"=cat.not.served.counter, "profit"=profit, "mean_queue"=mean_queue))
+}
 ```
 
+```{r}
+results_2_b<-replicate(100,dogcatia_service_rate_increased_by_10_precent())
+
+dogs_served_estimator_service_rate_increased_by_10_precent <- mean(as.numeric(results_2_b[1,]))
+dogs_reject_estimator_service_rate_increased_by_10_precent<-mean(as.numeric(results_2_b[2,]))
+cats_served_estimator_service_rate_increased_by_10_precent<-mean(as.numeric(results_2_b[3,]))
+cats_reject_estimator_service_rate_increased_by_10_precent<-mean(as.numeric(results_2_b[4,]))
+profit_estimator_service_rate_increased_by_10_precent<-mean(as.numeric(results_2_b[5,]))
+mean_queue_estimator_service_rate_increased_by_10_precent<-mean(as.numeric(results_2_b[6,])) 
+```
+
+```{r}
+cat(paste("The dogs served estimator is",dogs_served_estimator_service_rate_increased_by_10_precent,
+        "The dogs reject estimator is",dogs_reject_estimator_service_rate_increased_by_10_precent,
+        "The cats served estimator is",cats_served_estimator_service_rate_increased_by_10_precent,
+        "The cats reject estimator is",cats_reject_estimator_service_rate_increased_by_10_precent,
+        "The profit estimator is",profit_estimator_service_rate_increased_by_10_precent,
+        "The mean queue estimator is",mean_queue_estimator_service_rate_increased_by_10_precent,sep = "\n"))
+```
+
+### c ###
+
+```{r}
+dogcatia_queue_for_dogs_queue_for_cats<-function()
+{
+  # arrival times of dogs
+  dogs.arrive.time<-rexp(1,3)
+  
+  while(dogs.arrive.time[length(dogs.arrive.time)]<720)
+  {
+    dogs.arrive.time<-c(dogs.arrive.time,dogs.arrive.time[length(dogs.arrive.time)]+rexp(1,3))
+  }
+  
+  # arrival times of cats
+  cats.arrive.time<-rexp(1,1.5)
+  while(cats.arrive.time[length(cats.arrive.time)]<720)
+  {
+    cats.arrive.time<-c(cats.arrive.time,cats.arrive.time[length(cats.arrive.time)]+rexp(1,1.5))
+  }
+  
+  #service time's of dogs
+  dogs.serve.time<-rexp(length(dogs.arrive.time),3)
+  
+  #service time's of cats
+  cats.serve.time<-rexp(length(cats.arrive.time),5)
+  
+  free_place.dogs<-0   # marks the current time for dogs
+  place.dogs<-0   # a time when the next dog's service begins
+  profit.dogs<-0   # the company profit from dogs 
+  waited.dogs<-c()   # a vector of the queuing dogs
+  free_place.cats<-0   # marks the current time for cats
+  place.cats<-0   # a time when the next cat's service begins
+  profit.cats<-0   #the company profit from cats 
+  waited.cats<-c()   #a vector of the queuing cats
+  dogs_out<-c()   # a vector for the served dogs
+  cats_out<-c()   # a vector for the served cats
+  dog.served.counter<-0   #number of dogs have served
+  cat.served.counter<-0   #number of cats have served   
+  dog.not.served.counter<-0   #number of dogs have rejected 
+  cat.not.served.counter<-0   #number of cats have rejected 
+  dogs.times<-dogs.arrive.time   # arrival times vector of dogs
+  cats.times<-cats.arrive.time   # arrival times vector of cats
+  num_waited.dogs<-c(0)   # a vector of the number of queuing dogs at all time intervals
+  num_times.dogs<-c(0)   # a vector of the start time of the dogs intervals
+  num_waited.cats<-c(0)   # a vector of the number of queuing cats at all time intervals
+  num_times.cats<-c(0)   # a vector of the start time of the cats intervals
+  #for dogs only
+  while(free_place.dogs<=720)   #as long as 12 hours have not passed
+  {
+    #"x" is the next dog that arrived
+    x<-dogs.times[1]   
+    #if the turtle is available now
+    if(free_place.dogs<x)   
+    {
+      # and there is no dog that waiting in the queue
+      if(length(waited.dogs)==0)
+      {
+        #so "x" can go inside
+        place.dogs<-x
+        #calculate the time that "x" will finish the service
+        free_place.dogs<-place.dogs + dogs.serve.time[which(dogs.arrive.time==x)]
+        #check if "x" will finish before 12 hours have  passed
+        if(free_place.dogs<=720)
+        {
+          dog.served.counter<-dog.served.counter+1
+          profit.dogs<-profit.dogs+1
+          dogs_out<-c(dogs_out,x)
+          dogs.times<-dogs.times[-1]
+        }
+      }
+      #if the turtle is available now, but there are dogs that waiting in the queue before "x"
+      if(length(waited.dogs)>0)
+      {
+        #the first dog in the queue will enter 
+        place.dogs<-free_place.dogs
+        num_times.dogs<-c(num_times.dogs, place.dogs)
+        #calculate the time that the first dog in the queue will finish the service
+        free_place.dogs<-place.dogs+dogs.serve.time[which(dogs.arrive.time==waited.dogs[1])]
+        #check if he will finish before the shop closed
+        if(free_place.dogs<=720)
+        {
+          dog.served.counter<-dog.served.counter+1
+          profit.dogs<-profit.dogs+1
+          #remove the dog from the queue
+          waited.dogs<-waited.dogs[-1]
+          num_waited.dogs<-c(num_waited.dogs, length(waited.dogs))
+        }
+      }
+      #if the turtle is not available now
+    }else
+    {
+      #if there is a place for "x" in the queue, 
+      #"x" will enter the queue
+      if(length(waited.dogs)<9)
+      {
+        waited.dogs<-c(waited.dogs,x)
+        num_waited.dogs<-c(num_waited.dogs, length(waited.dogs))
+        num_times.dogs<-c(num_times.dogs, waited.dogs[length(waited.dogs)])
+        #if there is no place for "x" in the queue, 
+        #"x" will be rejected
+      }else
+      {
+        dog.not.served.counter<-dog.not.served.counter+1
+        profit.dogs<-profit.dogs-0.1
+      }
+      dogs_out<-c(dogs_out,x)
+      dogs.times<-dogs.times[-1]
+    }
+  }
+  #calculate the average number of dogs in the queue
+  num_times_help.dogs<-(num_times.dogs)-(c(0,num_times.dogs[-length(num_times.dogs)]))
+  final_num_times.dogs<-num_times_help.dogs[-1]
+  if(length(num_waited.dogs)>length(final_num_times.dogs))
+  {
+    if(num_waited.dogs[length(num_waited.dogs)]==0)
+    {
+      num_waited.dogs<-num_waited.dogs[-length(num_waited.dogs)]
+    }
+  }
+  mean_queue.dogs<-(sum(num_waited.dogs * final_num_times.dogs))/720
+  #for cats only
+  while(free_place.cats<=720)   #as long as 12 hours have not passed
+  {
+    #"y" is the next cat that arrived
+    y<-cats.times[1]
+    #if the turtle is available now
+    if(free_place.cats<y)
+    {
+      #and there is no cat that waiting in the queue
+      if(length(waited.cats)==0)
+      {
+        #so "y" can go inside
+        place.cats<-y
+        #calculate the time that "y" will finish the service
+        free_place.cats<-place.cats+cats.serve.time[which(cats.arrive.time==y)]
+        #check if "y" will finish before 12 hours have  passed
+        if(free_place.cats<=720)
+        {
+          cat.served.counter<-cat.served.counter+1
+          profit.cats<-profit.cats+3
+          cats_out<-c(cats_out,y)
+          cats.times<-cats.times[-1]
+        }
+      }
+      #if the turtle is available now, but there is a cat that waiting in the queue before "y"
+      if(length(waited.cats)==1)
+      {
+        #the cat in the queue will enter
+        place.cats<-free_place.cats
+        num_times.cats<-c(num_times.cats, place.cats)
+        #calculate the time that the cat in the queue will finish the service
+        free_place.cats<-place.cats+cats.serve.time[which(cats.arrive.time==waited.cats)]
+        #check if he will finish before the shop closed
+        if(free_place.cats<=720)
+        {
+          cat.served.counter<-cat.served.counter+1
+          profit.cats<-profit.cats+3
+          #remove the cat from the queue
+          waited.cats<-waited.cats[-1]
+          num_waited.cats<-c(num_waited.cats, length(waited.cats))
+        }
+      }
+      #if the turtle is not available now
+    }else
+    {
+      #if there is no cat that waiting in the queue, 
+      #"y" will enter the queue
+      if(length(waited.cats)==0)
+      {
+        waited.cats<-c(waited.cats,y)
+        num_waited.cats<-c(num_waited.cats, length(waited.cats))
+        num_times.cats<-c(num_times.cats, waited.cats[length(waited.cats)])
+        #if there is a cat that waiting in the queue, 
+        #"y" will be rejected      
+      }else
+      {
+        cat.not.served.counter<-cat.not.served.counter+1
+      }
+      cats_out<-c(cats_out,y)
+      cats.times<-cats.times[-1]
+    }
+  }
+  #calculate the average number of cats in the queue
+  num_times_help.cats<-(num_times.cats)-(c(0,num_times.cats[-length(num_times.cats)]))
+  final_num_times.cats<-num_times_help.cats[-1]
+  if(length(num_waited.cats)>length(final_num_times.cats))
+  {
+    if(num_waited.cats[length(num_waited.cats)]==0)
+    {
+      num_waited.cats<-num_waited.cats[-length(num_waited.cats)]
+    }
+  }
+  mean_queue.cats<-(sum(num_waited.cats * final_num_times.cats))/720
+  #calculate the total profit of the company
+  total_profit<-profit.cats+profit.dogs
+  return(list("dogs_served"=dog.served.counter, "dogs_reject"=dog.not.served.counter, "cats_served"=cat.served.counter, "cats_reject"=cat.not.served.counter, "profit"=total_profit, "mean_queue_dogs"=mean_queue.dogs, "mean_queue_cats"=mean_queue.cats))
+}
+```
 
 
 ```{r}
+results_2_c<-replicate(100,dogcatia_queue_for_dogs_queue_for_cats())
 
-animal_comes <- func() {
-   x <- rpois(1,3)
-   y <- rpois(1,1.5)
-   if (y<=x){
-     if (r>0){
-       r.c.n <- r.c.n + 1
-       }else{
-         r.c <- r.c + 1
-         turn_df[r+1,r+1] <-  "cat"
-         t.counter <- t.counter + y
-         }
-     if(r<10){
-       r.d <- r.d + 1
-       turn_df[r+1,r+1] <- "dog"
-       t.counter <- t.counter + x
-       }else{
-         r.d.n <- r.d.n + 1
-       }
-     }
-   if (y>x){
-     if(r<10){
-       r.d <- r.d + 1
-       turn_df[r+1,r+1] <- "dog"
-       t.counter <- t.counter + x
-       }else{
-        r.d.n <- r.d.n + 1
-        }
-     if (r>0){
-       r.c.n <- r.c.n + 1
-       }else{
-         r.c <- r.c + 1
-         turn_df[r+1,r+1] <-  "cat"
-         t.counter <- t.counter + y
-       }
-   }
-   }
-
-
-
-
-while(t<720){
-    # an animal comes
-    x <- rpois(1,3)
-    y <- rpois(1,1.5)
-    if(r<10){
-      r.d <- r.d + 1
-      turn_df[r+1,r+1] <- "dog"
-      t.counter <- t.counter + x
-      }else{
-        r.d.n <- r.d.n + 1
-        }
-    if (r>0){
-      r.c.n <- r.c.n + 1
-    }else{
-      r.c <- r.c + 1
-      turn_df[r+1,r+1] <-  "cat"
-      t.counter <- t.counter + y
-      }
-  }
-    # server an animal
-    if(turn_df[1,1]=="dog"){
-      x.1 <- rexp(1,3)
-    }
-  
+dogs_served_estimator_queue_for_dogs_queue_for_cats <- mean(as.numeric(results_2_c[1,]))
+dogs_reject_estimator_queue_for_dogs_queue_for_cats<-mean(as.numeric(results_2_c[2,]))
+cats_served_estimator_queue_for_dogs_queue_for_cats<-mean(as.numeric(results_2_c[3,]))
+cats_reject_estimator_queue_for_dogs_queue_for_cats<-mean(as.numeric(results_2_c[4,]))
+profit_estimator_queue_for_dogs_queue_for_cats<-mean(as.numeric(results_2_c[5,]))
+mean_queue_dods_estimator_queue_for_dogs_queue_for_cats<-mean(as.numeric(results_2_c[6,]))
+mean_queue_cats_estimator_queue_for_dogs_queue_for_cats<-mean(as.numeric(results_2_c[7,]))
 ```
+
+
+```{r}
+cat(paste("The dogs served estimator is",dogs_served_estimator_queue_for_dogs_queue_for_cats,
+        "The dogs reject estimator is",dogs_reject_estimator_queue_for_dogs_queue_for_cats,
+        "The cats served estimator is",cats_served_estimator_queue_for_dogs_queue_for_cats,
+        "The cats reject estimator is",cats_reject_estimator_queue_for_dogs_queue_for_cats,
+        "The profit estimator is",profit_estimator_queue_for_dogs_queue_for_cats,
+        "The mean dogs queue estimator is",mean_queue_dods_estimator_queue_for_dogs_queue_for_cats,
+        "The mean cats queue estimator is",mean_queue_cats_estimator_queue_for_dogs_queue_for_cats,sep = "\n"))
+```
+
+We recommend the third option because the amount of dogs and cats (together) that receive service is the highest.
+In addition the company's profit from this option is the highest
 
